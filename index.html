@@ -208,6 +208,7 @@ select.fi{cursor:pointer;}
     <div class="nav-section">Tools</div>
     <div class="nav-item" data-panel="upload"><span class="nav-icon">⊕</span>Upload Screenshot</div>
     <div class="nav-item" data-panel="chat"><span class="nav-icon">◉</span>AI Chat</div>
+    <div class="nav-item" data-panel="settings"><span class="nav-icon">⚙</span>Settings</div>
   </div>
   <div class="sid-weather">
     <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -233,6 +234,7 @@ select.fi{cursor:pointer;}
       <button class="tab" data-panel="countdown">Countdown</button>
       <button class="tab" data-panel="upload">Upload</button>
       <button class="tab" data-panel="chat">Chat</button>
+      <button class="tab" data-panel="settings">Settings</button>
     </div>
     <button class="icon-btn" onclick="toggleTheme()" id="themeBtn">☀ light</button>
   </div>
@@ -525,6 +527,22 @@ select.fi{cursor:pointer;}
       </div>
     </div>
 
+    <!-- SETTINGS -->
+    <div class="panel" id="panel-settings">
+      <div class="card">
+        <div class="card-hd"><div class="card-title">// ai api key</div></div>
+        <div class="card-body">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6;">Paste your Anthropic API key below. It's saved only in your browser — never sent to GitHub or anywhere else. Get your key at <span style="color:var(--accent);font-family:var(--mono)">console.anthropic.com</span> → API Keys.</div>
+          <div class="form-row">
+            <input class="fi" id="apiKeyInput" type="password" placeholder="sk-ant-..." style="font-family:var(--mono);"/>
+            <button class="btn" onclick="saveApiKey()">Save key</button>
+            <button class="btn btn-g" onclick="clearApiKey()">Clear</button>
+          </div>
+          <div id="apiKeyStatus" style="font-size:11px;font-family:var(--mono);margin-top:10px;color:var(--text3)"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 </div>
@@ -538,6 +556,10 @@ const GCC=['#4a9eff','#3dba6f','#e05555','#e0a030','#9b6dff','#3dbaba','#e07030'
 
 function ls(k,d){try{return JSON.parse(localStorage.getItem(k)||d);}catch{return JSON.parse(d);}}
 function sv(k,v){localStorage.setItem(k,JSON.stringify(v));}
+function getKey(){return localStorage.getItem('dx_apikey')||'';}
+function saveApiKey(){const k=document.getElementById('apiKeyInput').value.trim();if(!k)return;localStorage.setItem('dx_apikey',k);document.getElementById('apiKeyInput').value='';document.getElementById('apiKeyStatus').textContent='✓ Key saved';document.getElementById('apiKeyStatus').style.color='var(--green)';}
+function clearApiKey(){localStorage.removeItem('dx_apikey');document.getElementById('apiKeyStatus').textContent='Key cleared';document.getElementById('apiKeyStatus').style.color='var(--text3)';}
+function checkKeyOnLoad(){const k=getKey();const el=document.getElementById('apiKeyStatus');if(k){el.textContent='✓ Key is set ('+k.slice(0,10)+'...)';el.style.color='var(--green)';}else{el.textContent='No key set — AI chat and uploads will not work';el.style.color='var(--amber)';}}
 let A=ls('dx_a','[]'),E=ls('dx_e','[]'),SB=ls('dx_sb','[]'),H=ls('dx_h','[]'),SL=ls('dx_sl','[]'),CD=ls('dx_cd','[]'),SS=ls('dx_ss','[]'),FS=ls('dx_fs','[]');
 let G=ls('dx_g','{}');if(!G||typeof G!=='object')G={};
 let chatHist=[],parsedItems=[],filt='all',calY,calM,wkOff=0,wData=null;
@@ -711,7 +733,7 @@ function handleFormulaUpload(file){
 async function processFormula(b64,mime,cls,label,dataUrl){
   const st=document.getElementById('fStatus');st.style.display='block';st.innerHTML='<span class="dots">Extracting formulas</span>';
   try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':'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','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mime,data:b64}},{type:'text',text:`Analyze this formula sheet for ${cls||'a class'}. List the key formulas, variables, and concepts shown. Be concise. Use a numbered list, plain text, no markdown.`}]}]})});
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':getKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mime,data:b64}},{type:'text',text:`Analyze this formula sheet for ${cls||'a class'}. List the key formulas, variables, and concepts shown. Be concise. Use a numbered list, plain text, no markdown.`}]}]})});
     const d=await r.json();const summary=d.content?.[0]?.text||'Could not extract.';
     FS.push({id:Date.now(),cls,label,dataUrl,summary});sv('dx_fs',FS);
     st.style.display='none';document.getElementById('fClass').value='';document.getElementById('fLabel').value='';document.getElementById('fFile').value='';
@@ -835,7 +857,7 @@ function handleFile(file){if(!file||!file.type.startsWith('image/'))return;const
 async function parseScreen(b64,mime){
   const st=document.getElementById('parseStatus');const res=document.getElementById('parsedResults');
   st.style.display='block';res.style.display='none';st.innerHTML='<span class="dots">Analyzing screenshot</span>';
-  try{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':'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','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mime,data:b64}},{type:'text',text:`Extract all assignments/tasks. Return ONLY a JSON array, no other text. Each item: {"name":"name","cls":"class or empty","due":"YYYY-MM-DDTHH:MM or empty","pts":"points or empty"}. Match cls to: ${CLASSES.join(', ')}. Today is ${td()}.`}]}]})});
+  try{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':getKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mime,data:b64}},{type:'text',text:`Extract all assignments/tasks. Return ONLY a JSON array, no other text. Each item: {"name":"name","cls":"class or empty","due":"YYYY-MM-DDTHH:MM or empty","pts":"points or empty"}. Match cls to: ${CLASSES.join(', ')}. Today is ${td()}.`}]}]})});
     const d=await r.json();parsedItems=JSON.parse((d.content?.[0]?.text||'[]').replace(/```json|```/g,'').trim());
     renderParsed();st.style.display='none';res.style.display='block';
   }catch{st.textContent='Could not parse. Try a clearer image.';}
@@ -868,13 +890,13 @@ Pending: ${A.filter(a=>!a.done).length}`;
 function addMsg(role,text){const el=document.getElementById('chatMsgs');const t=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});const d=document.createElement('div');d.className='msg '+role;d.innerHTML=`<div class="bubble">${text}</div><div class="msg-t">${t}</div>`;el.appendChild(d);el.scrollTop=el.scrollHeight;return d;}
 function quickAsk(t){document.getElementById('chatIn').value=t;sendChat();}
 async function sendChat(){const inp=document.getElementById('chatIn');const txt=inp.value.trim();if(!txt)return;inp.value='';addMsg('u',txt);chatHist.push({role:'user',content:txt});const ld=addMsg('a','<span class="dots">Thinking</span>');
-  try{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:buildCtx(),messages:chatHist})});const d=await r.json();const rep=d.content?.[0]?.text||'Error.';ld.querySelector('.bubble').textContent=rep;chatHist.push({role:'assistant',content:rep});if(chatHist.length>20)chatHist=chatHist.slice(-20);}
+  try{const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':getKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:buildCtx(),messages:chatHist})});const d=await r.json();const rep=d.content?.[0]?.text||'Error.';ld.querySelector('.bubble').textContent=rep;chatHist.push({role:'assistant',content:rep});if(chatHist.length>20)chatHist=chatHist.slice(-20);}
   catch{ld.querySelector('.bubble').textContent='Request failed.';}
   document.getElementById('chatMsgs').scrollTop=9999;
 }
 
 function renderAll(){renderToday();renderTodo();renderEvents();renderUpcoming();}
-renderAll();updateTimerDisplay();
+renderAll();updateTimerDisplay();checkKeyOnLoad();
 </script>
 </body>
 </html>
